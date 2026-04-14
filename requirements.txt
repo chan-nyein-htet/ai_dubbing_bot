@@ -1,0 +1,18 @@
+# Core Engine
+moviepy==2.2.1
+pillow==11.3.0
+imageio-ffmpeg==0.6.0
+
+# AI Transcription & TTS
+faster-whisper==1.2.1
+edge-tts==7.2.8
+openai-whisper==20250625
+
+# Automation & Bot
+python-telegram-bot==22.7
+python-dotenv==1.2.2
+
+# Helper Libraries
+requests==2.33.1
+tqdm==4.67.3
+numpy==2.4.4
