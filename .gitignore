@@ -5,3 +5,7 @@ __pycache__/
 *.mp3
 *.log
 .env
+downloads/
+*.json
+*.txt
+audio_segments/

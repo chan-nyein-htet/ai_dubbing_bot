@@ -16,3 +16,8 @@ python-dotenv==1.2.2
 requests==2.33.1
 tqdm==4.67.3
 numpy==2.4.4
+yt-dlp
+google-auth-oauthlib
+google-api-python-client
+pytube
+deep-translator==1.11.4

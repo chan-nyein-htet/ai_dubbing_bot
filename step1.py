@@ -1,55 +1,98 @@
-import yt_dlp
 import os
 import shutil
+import subprocess
 
-def process_input(user_input):
-    # ၁။ အရင်ရှိနေတဲ့ file တွေကို ရှင်းထုတ်မယ်
-    for f in ["original_video.mp4", "original_audio.mp3"]:
-        if os.path.exists(f):
-            os.remove(f)
+def get_unique_filename(base_name, user_dir):
+    """ဖိုင်နာမည်တူရှိရင် old_video_1.mp4 စသဖြင့် အော်တို နာမည်ပြောင်းပေးရန် (User Folder ထဲတွင်)"""
+    full_path = os.path.join(user_dir, base_name)
+    if not os.path.exists(full_path):
+        return full_path
+    
+    name, ext = os.path.splitext(base_name)
+    counter = 1
+    while os.path.exists(os.path.join(user_dir, f"{name}_{counter}{ext}")):
+        counter += 1
+    return os.path.join(user_dir, f"{name}_{counter}{ext}")
 
-    # ၂။ Input က YouTube Link လား၊ Local File လား စစ်မယ်
-    if user_input.startswith(("http://", "https://", "www.")):
-        print(f"🌐 Link ရှာတွေ့တယ်... YouTube ကနေ ဒေါင်းနေပြီ...")
+def process_input(user_input, user_dir):
+    # ဖိုင်လမ်းကြောင်းများကို user_dir နှင့် ချိတ်ဆက်ခြင်း
+    video_path = os.path.join(user_dir, "original_video.mp4")
+    audio_path = os.path.join(user_dir, "original_audio.mp3")
+
+    # ဒေါင်းလုဒ်ဆွဲရန် အကြံပြုချက်များ
+    download_tools = [
+        "1. Seal (Android - အကြံပြုသည်)",
+        "2. VidMate",
+        "3. SnapTube",
+        "4. Blackhole",
+        "5. 1DM (Download Manager)",
+        "6. NewPipe",
+        "7. Y2Mate (Website)",
+        "8. SaveFrom.net (Website)",
+        "9. SnapTik (For TikTok)",
+        "10. SaveSubs (For Subtitles)"
+    ]
+
+    # အရင်ရှိနေတဲ့ ဖိုင်တွေကို Backup လုပ်ပြီး ဖယ်ပေးခြင်း (User Folder ထဲမှာပဲ လုပ်မယ်)
+    if os.path.exists(video_path):
+        os.rename(video_path, get_unique_filename("old_video.mp4", user_dir))
+    if os.path.exists(audio_path):
+        os.rename(audio_path, get_unique_filename("old_audio.mp3", user_dir))
+
+    # ၁။ Link ထည့်ခဲ့လျှင်
+    if user_input.startswith(("http", "www")):
+        print(f"🌐 ဗီဒီယိုနှင့် အသံဖိုင်ကို အွန်လိုင်းမှ ရယူနေပါသည်...")
         
-        ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'outtmpl': 'original_video.mp4',
-        }
-        audio_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': 'original_audio',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([user_input])
-        with yt_dlp.YoutubeDL(audio_opts) as ydl:
-            ydl.download([user_input])
-
-    else:
-        # Local File ဖြစ်ခဲ့ရင်
-        if os.path.exists(user_input):
-            print(f"📁 Local File ရှာတွေ့တယ်: {user_input}")
-            # Video ကို original_video.mp4 အဖြစ် နာမည်ပြောင်း/ကူးမယ်
-            shutil.copy(user_input, "original_video.mp4")
-            
-            # Transcription အတွက် အသံဖိုင် သီးသန့်ထုတ်မယ် (FFmpeg သုံးမယ်)
-            print("🎙️ အသံဖိုင် ခွဲထုတ်နေတယ်...")
-            os.system(f"ffmpeg -i {user_input} -q:a 0 -map a original_audio.mp3 -y")
-        else:
-            print("❌ Error: Link လည်းမဟုတ်၊ File လည်း ရှာမတွေ့ပါ!")
+        # TikTok အတွက် Audio ပါအောင် format ကို "best" ဟု ပြောင်းလဲသတ်မှတ်ခြင်း
+        yt_cmd = [
+            "yt-dlp", 
+            "-f", "bestvideo+bestaudio/best", 
+            "--merge-output-format", "mp4",
+            "--output", video_path, 
+            user_input
+        ]
+        result = subprocess.run(yt_cmd)
+        
+        # ဒေါင်းလုဒ်ဆွဲ၍ မရခဲ့လျှင်
+        if result.returncode != 0:
+            print("\n❌ ခွင့်လွှတ်ပါခင်ဗျာ၊ ယခု Link ကို တိုက်ရိုက်ဒေါင်းလုပ်ဆွဲ၍ မရနိုင်ပါ။")
+            print("💡 အောက်ပါ Tools တစ်ခုခုကို အသုံးပြု၍ သင့်ဖုန်းထဲသို့ အရင်ဒေါင်းလုဒ်ဆွဲပေးပါ။")
+            print("   ပြီးလျှင် ဒေါင်းလုဒ်ဆွဲထားသော ဖိုင်ကို ဤနေရာသို့ Upload တင်ပေးပါခင်ဗျာ:\n")
+            for tool in download_tools:
+                print(f"   {tool}")
             return
+            
+    # ၂။ ဖိုင်အမည် တိုက်ရိုက်ရိုက်ထည့်လျှင်
+    elif os.path.exists(user_input):
+        print(f"📁 ဖိုင်ကို စစ်ဆေးနေပါသည်...")
+        shutil.copy(user_input, video_path)
+    else:
+        print("❌ Error: ဖိုင်အမည် မှားယွင်းနေခြင်း သို့မဟုတ် Link မှားယွင်းနေပါသည်။")
+        return
 
-    print("\n✅ Step 1 ပြီးပါပြီ!")
-    print("📁 original_video.mp4 နှင့် original_audio.mp3 အဆင်သင့်ရှိပါသည်။")
+    # ၃။ အသံဖိုင် ခွဲထုတ်ခြင်း
+    if os.path.exists(video_path):
+        print("🎙️ အသံဖိုင်ကို တိတိကျကျ ခွဲထုတ်နေပါသည်...")
+        # FFmpeg အမိန့်ကို ပိုမိုတိကျအောင် ပြန်လည်ပြင်ဆင်ခြင်း
+        cmd = [
+            "ffmpeg", "-i", video_path, 
+            "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", 
+            audio_path, "-y"
+        ]
+        subprocess.run(cmd)
+        
+        if os.path.exists(audio_path):
+            print("\n✅ လုပ်ငန်းစဉ် အပိုင်း (၁) အောင်မြင်စွာ ပြီးဆုံးပါပြီ!")
+            print(f"📁 ဖိုင်များကို {user_dir} ထဲတွင် သိမ်းဆည်းပြီးပါပြီ။")
+        else:
+            print("⚠️ Error: အသံဖိုင် ခွဲထုတ်၍ မရပါခင်ဗျာ။ ဗီဒီယိုတွင် အသံပါဝင်မှု ရှိမရှိ ပြန်လည်စစ်ဆေးပေးပါ။")
 
 if __name__ == "__main__":
-    path_or_link = input("🔗 YouTube Link သို့မဟုတ် File Path ထည့်ပါ: ").strip()
-    # Path ထဲမှာ ' ' (space) ပါရင် ဖယ်ပေးဖို့ strip() သုံးထားတယ်
-    process_input(path_or_link)
+    # စမ်းသပ်ရန်အတွက် download folder ကို path အဖြစ်ပေးထားမယ်
+    test_dir = "downloads"
+    if not os.path.exists(test_dir):
+        os.makedirs(test_dir)
+        
+    url = input("🔗 Link သို့မဟုတ် ဖိုင်အမည် ရိုက်ထည့်ပါ: ").strip()
+    process_input(url, test_dir)
 
