@@ -1,89 +1,47 @@
 import os
 import re
-import time
+import ollama
 from deep_translator import GoogleTranslator
 
-def parse_duration(time_str):
-    times = re.findall(r"(\d+\.\d+)", time_str)
-    if len(times) == 2:
-        start, end = float(times[0]), float(times[1])
-        return start, end, end - start
-    return 0.0, 0.0, 0.0
-
-def read_transcript(user_dir):
-    lines = []
-    transcript_path = os.path.join(user_dir, "transcription.txt")
-    if not os.path.exists(transcript_path):
-        return None
-    with open(transcript_path, "r", encoding="utf-8") as f:
-        for line in f:
-            if " -> " in line:
-                parts = line.split("] ", 1)
-                time_range = parts[0] + "]"
-                text_part = parts[1].strip()
-                start, end, duration = parse_duration(time_range)
-                lines.append({
-                    "time": time_range, 
-                    "start": start, 
-                    "end": end, 
-                    "duration": duration,
-                    "text": text_part
-                })
-    return lines
-
-def translate_text(text):
-    return GoogleTranslator(source='auto', target='my').translate(text)
-
-def main_process(user_dir, choice):
-    data = read_transcript(user_dir)
-    if not data:
-        print(f"❌ {user_dir} ထဲမှာ transcription.txt ကို ရှာမတွေ့ပါ။")
-        return
-
-    sync_path = os.path.join(user_dir, "sync_voiceover_script.txt")
-    total_lines = len(data)
+def refine_with_ollama(myanmar_text, duration, mode):
+    if mode == "3": return myanmar_text # Subtitles သက်သက်ဆိုရင် Google Translate အတိုင်းပဲ ထားမယ်
     
-    print(f"⏳ စတင်နေပါပြီ... စုစုပေါင်း ({total_lines}) ကြောင်း ရှိပါတယ်။")
+    style = "Casual Burmese 'မင်း/ငါ' Recap style." if mode == "1" else "Natural Burmese Dubbing style."
+    prompt = f"Refine this Burmese: '{myanmar_text}' to {style}. Keep it short for {duration:.1f}s. Only output Burmese."
+    
+    try:
+        response = ollama.generate(model='llama3.2', prompt=prompt)
+        refined = re.sub(r'[a-zA-Z]', '', response['response']).strip()
+        return refined if refined else myanmar_text
+    except: return myanmar_text
 
-    if choice in ["1", "2"]:
-        output_file = os.path.join(user_dir, "translated_subtitles.txt" if choice == "1" else "sync_voiceover_script.txt")
-        
-        with open(output_file, "w", encoding="utf-8") as f:
-            for i, item in enumerate(data):
-                translated = translate_text(item['text'])
-                
-                # Percentage calculation for Terminal
-                percent = int(((i + 1) / total_lines) * 100)
-                bar = '█' * (percent // 10) + '░' * (10 - (percent // 10))
-                print(f"\r进度: |{bar}| {percent}% ({i+1}/{total_lines})", end="")
-                
-                if choice == "1":
-                    f.write(f"{item['time']} {translated}\n")
-                else:
-                    f.write(f"[{item['start']:.2f}-{item['end']:.2f}]|{item['duration']:.2f}|{translated}\n")
-        
-        print(f"\n✅ အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ: {output_file}")
+def process_translation(user_id):
+    user_dir = os.path.join("users_workspace", str(user_id))
+    t_in = os.path.join(user_dir, "transcription.txt")
+    s_out = os.path.join(user_dir, "sync_voiceover_script.txt")
 
-    elif choice == "3":
-        print("📝 Generating Recap Plan...")
-        recap_path = os.path.join(user_dir, "recap_plan.txt")
-        summary_data = data[::len(data)//5] if len(data) > 5 else data
-        with open(recap_path, "w", encoding="utf-8") as f:
-            for s in summary_data:
-                translated = translate_text(s['text'])
-                f.write(f"{s['time']} {translated}\n")
-        print(f"✅ Recap Plan ရပါပြီ: {recap_path}")
+    if not os.path.exists(t_in): return
+
+    print("\n🌐 SELECT MODE:")
+    print("1. Recap (Voiceover ပါမယ်)")
+    print("2. Dubbing (Voiceover ပါမယ်)")
+    print("3. Subtitles Only (Step 4 မလိုပါ - မူရင်းအသံ + စာတန်းထိုး)")
+    mode = input("Choice (1, 2, 3): ") or "1"
+
+    translator = GoogleTranslator(source='en', target='my')
+
+    with open(t_in, "r", encoding="utf-8") as f, open(s_out, "w", encoding="utf-8") as out:
+        for line in f:
+            times = re.findall(r"(\d+\.\d+)", line)
+            if len(times) >= 2:
+                start, end, content = float(times[0]), float(times[1]), line.split("] ", 1)[1].strip()
+                print(f"⌛ Translating {start}s...")
+                my_raw = translator.translate(content)
+                final_text = refine_with_ollama(my_raw, end-start, mode)
+                out.write(f"[{start:.2f}-{end:.2f}]|{end-start:.2f}|{final_text}\n")
+
+    print(f"✅ Step 3 Done! Mode {mode} ကို ရွေးထားတဲ့အတွက် " + ("Step 4 ကို ကျော်ပြီး Step 5 တန်းသွားလို့ရပါပြီ Dude!" if mode == "3" else "Step 4 ကို ဆက်သွားပါ!"))
 
 if __name__ == "__main__":
-    test_dir = "downloads"
-    if not os.path.exists(test_dir):
-        os.makedirs(test_dir)
-
-    print("\n--- 🤖 Pro Sync Processing Menu ---")
-    print("1. Subtitles (မြန်မာစာတန်းထိုး)")
-    print("2. Sync Voiceover (Scene နဲ့ အသံ ညှိရန် - အကြံပြုသည်)")
-    print("3. Basic Recap (စာသားအကျဉ်းချုပ်)")
-    
-    user_choice = input("\nရွေးချယ်ပါ (1/2/3): ")
-    main_process(test_dir, user_choice)
-
+    u_id = input("Enter User ID: ").strip()
+    process_translation(u_id)

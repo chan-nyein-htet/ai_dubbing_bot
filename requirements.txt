@@ -1,23 +1,28 @@
-# Core Engine
+# Core Engine & Video Processing
 moviepy==2.2.1
 pillow==11.3.0
 imageio-ffmpeg==0.6.0
+numpy==2.2.0
 
 # AI Transcription & TTS
 faster-whisper==1.2.1
 edge-tts==7.2.8
 openai-whisper==20250625
+ollama  # Local AI Integration အတွက်
 
-# Automation & Bot
-python-telegram-bot==22.7
-python-dotenv==1.2.2
+# Cloud & Integration (Dropbox)
+dropbox==12.0.2
+
+# Automation & Bot (Telegram)
+python-telegram-bot[job-queue]==21.10
+python-dotenv==1.0.1
 
 # Helper Libraries
-requests==2.33.1
-tqdm==4.67.3
-numpy==2.4.4
+requests==2.32.3
+tqdm==4.66.4
 yt-dlp
 google-auth-oauthlib
 google-api-python-client
 pytube
 deep-translator==1.11.4
+aiohttp==3.11.11
